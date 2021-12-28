@@ -1,3 +1,4 @@
+import numpy as np
 import onnx
 import onnxruntime
 import torch
@@ -23,6 +24,24 @@ def convert(model, x):
     onnx.checker.check_model(onnx_model)
 
 
+def test_output(torch_out, x):
+    ort_session = onnxruntime.InferenceSession(ONNX_MODEL_NAME)
+
+    def to_numpy(tensor):
+        if tensor.requires_grad:
+            return tensor.detach().cpu().numpy()
+        else:
+            tensor.cpu().numpy()
+
+    ort_inputs = {ort_session.get_inputs()[0].name: to_numpy(x)}
+    ort_outs = ort_session.run(None, ort_inputs)
+
+    for i,j in zip(torch_out, ort_outs):
+        np.testing.assert_allclose(to_numpy(i), j, rtol=1e-03, atol=1e-05)
+
+    print("Exported model has been tested with ONNXRuntime, and the result looks good!")
+
+
 def main():
     craft = Craft(
         output_dir=None,
@@ -45,6 +64,7 @@ def main():
     x = torch.randn(batch_size, 3, 224, 224, requires_grad=True)
     torch_out = model(x)
     convert(model, x)
+    test_output(torch_out, x)
 
 
 if __name__ == '__main__':
