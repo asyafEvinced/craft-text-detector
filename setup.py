@@ -32,7 +32,7 @@ setuptools.setup(
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
     url="https://github.com/fcakyon/craft_text_detector",
-    packages=setuptools.find_packages(exclude=["tests"]),
+    packages=setuptools.find_packages(exclude=["tests", "onnx"]),
     install_requires=get_requirements(),
     python_requires=">=3.7",
     classifiers=[

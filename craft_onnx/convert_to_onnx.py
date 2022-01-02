@@ -2,7 +2,6 @@ import numpy as np
 import logging
 import onnx
 from onnxconverter_common import convert_float_to_float16_model_path
-import onnxruntime
 from onnxruntime.quantization import quantize_dynamic, QuantType
 from pathlib import Path
 from PIL import Image
@@ -11,6 +10,7 @@ import torch
 from torchvision import transforms
 
 from craft_text_detector import Craft
+from craft_onnx.utils import run_onnx_model, to_numpy
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
@@ -20,11 +20,11 @@ ONNX_MODEL_FILE = f'{ONNX_MODEL_NAME}{ONNX_EXT}'
 IMG_PATH = '../figures/idcard.png'
 
 
-def test_onnx_model(model_path, input_data):
+def test_onnx_model(model_path, input_data, is_fp16=False):
     onnx_model = onnx.load(model_path)
-    # onnx.checker.check_model(onnx_model)
+    onnx.checker.check_model(onnx_model)
     logging.info(f'Model check of {model_path} passed')
-    run_onnx_model(model_path, input_data)
+    run_onnx_model(model_path, input_data, is_fp16)
     logging.info(f'Model run successfully')
 
 
@@ -33,28 +33,13 @@ def convert_to_onnx(model, input_data, output_model_path):
                       input_data,
                       str(output_model_path),
                       export_params=True,
-                      opset_version=13, # conversion to flp16 doesn't work with lower opset
+                      opset_version=13,  # conversion to flp16 doesn't work with lower opset
                       do_constant_folding=True,
                       input_names=['input'],
                       output_names=['output'],
                       dynamic_axes={'input': {0: 'batch_size'},
                                     'output': {0: 'batch_size'}})
     test_onnx_model(output_model_path, input_data)
-
-
-def to_numpy(tensor):
-    if tensor.requires_grad:
-        return tensor.detach().cpu().numpy()
-    else:
-        tensor.cpu().numpy()
-
-
-def run_onnx_model(onnx_model, input_data):
-    ort_session = onnxruntime.InferenceSession(str(onnx_model))
-
-    ort_inputs = {ort_session.get_inputs()[0].name: to_numpy(input_data)}
-    ort_outs = ort_session.run(None, ort_inputs)
-    return ort_outs
 
 
 def test_output(torch_out, input_data, onnx_model):
@@ -76,11 +61,11 @@ def quantize_model_dynamic(onnx_model_path, quantization, input_data):
 
 
 def quantize_model_fp16(onnx_model_path, input_data):
-    new_onnx_model = convert_float_to_float16_model_path(onnx_model_path, keep_io_types=True)
+    new_onnx_model = convert_float_to_float16_model_path(onnx_model_path)
     model_name = onnx_model_path.stem
     quantized_model_file = f'{model_name}_quant_fp16{ONNX_EXT}'
     onnx.save(new_onnx_model, quantized_model_file)
-    test_onnx_model(quantized_model_file, input_data)
+    test_onnx_model(quantized_model_file, input_data, True)
     logging.info(f"Fp16 quantized model saved to: {quantized_model_file}")
 
 
