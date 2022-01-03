@@ -10,6 +10,7 @@ import torch
 from torchvision import transforms
 
 from craft_text_detector import Craft
+from craft_onnx.quantize_static import run_static_quantization
 from craft_onnx.utils import run_onnx_model, to_numpy
 
 logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
@@ -60,6 +61,15 @@ def quantize_model_dynamic(onnx_model_path, quantization, input_data):
     logging.info(f"Dynamically quantized model saved to: {quantized_model_file}")
 
 
+def quantize_model_static(onnx_model_path, input_data):
+    model_name = onnx_model_path.stem
+    quantized_model_file = f'{model_name}_quant_static{ONNX_EXT}'
+    calibration_dataset_path = 'test_images'
+    run_static_quantization(onnx_model_path, quantized_model_file, calibration_dataset_path)
+    test_onnx_model(quantized_model_file, input_data)
+    logging.info(f"Statically quantized model saved to: {quantized_model_file}")
+
+
 def quantize_model_fp16(onnx_model_path, input_data):
     new_onnx_model = convert_float_to_float16_model_path(onnx_model_path)
     model_name = onnx_model_path.stem
@@ -74,6 +84,7 @@ def run_quantizations(onnx_model_path, input_data):
     # TODO: find why this conversion fails
     # quantize_model_dynamic(onnx_model_path, QuantType.QInt8, input_data)
     quantize_model_fp16(onnx_model_path, input_data)
+    quantize_model_static(onnx_model_path, input_data)
 
 
 def load_craft_model():
